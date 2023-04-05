@@ -5,12 +5,11 @@
 
 #include <string>
 #include <string_view>
-#include <kstd/types.hpp>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <httplib.h>
-#include <nlohmann/json.hpp>
 #include <cxxopts/cxxopts.hpp>
+#include "gateway.hpp"
 
 auto main(int num_args, char** args) -> int {
     spdlog::set_default_logger(spdlog::create<spdlog::sinks::stdout_color_sink_mt>("FoxControl"));
@@ -25,6 +24,7 @@ auto main(int num_args, char** args) -> int {
         ("v,version", "Show version information")
         ("V,verbose", "Enable verbose logging")
         ("a,address", "Specify the address on which to listen for HTTP requests", cxxopts::value<std::string>()->default_value("127.0.0.1"))
+        ("e,endpoint", "Specify the name of the endpoint to take commands from", cxxopts::value<std::string>())
         ("p,port", "Specify the port on which to listen for HTTP requests", cxxopts::value<kstd::u32>()->default_value("8080"));
     // @formatter:on
 
@@ -55,6 +55,12 @@ auto main(int num_args, char** args) -> int {
         spdlog::info("FoxControl Gateway Version 1.0");
         return 0;
     }
+
+    const auto address = options["address"].as<std::string>();
+    const auto endpoint = options["endpoint"].as<std::string>();
+    const auto port = options["port"].as<kstd::u32>();
+
+    fox::Gateway gateway(address, endpoint, port);
 
     return 0;
 }
