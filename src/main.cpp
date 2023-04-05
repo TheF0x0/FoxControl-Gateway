@@ -25,7 +25,9 @@ auto main(int num_args, char** args) -> int {
         ("V,verbose", "Enable verbose logging")
         ("a,address", "Specify the address on which to listen for HTTP requests", cxxopts::value<std::string>()->default_value("127.0.0.1"))
         ("e,endpoint", "Specify the name of the endpoint to take commands from", cxxopts::value<std::string>())
-        ("p,port", "Specify the port on which to listen for HTTP requests", cxxopts::value<kstd::u32>()->default_value("8080"));
+        ("p,port", "Specify the port on which to listen for HTTP requests", cxxopts::value<kstd::u32>()->default_value("8080"))
+        ("b,backlog", "Specify the maximum of tasks that can be queued up internally", cxxopts::value<kstd::u32>()->default_value("500"))
+        ("P,password", "Specify the password with which to authenticate against the endpoint for queueing tasks", cxxopts::value<std::string>());
     // @formatter:on
 
     cxxopts::ParseResult options;
@@ -59,8 +61,10 @@ auto main(int num_args, char** args) -> int {
     const auto address = options["address"].as<std::string>();
     const auto endpoint = options["endpoint"].as<std::string>();
     const auto port = options["port"].as<kstd::u32>();
+    const auto backlog = options["backlog"].as<kstd::u32>();
+    const auto password = options["password"].as<std::string>();
 
-    fox::Gateway gateway(address, endpoint, port);
+    fox::Gateway gateway(address, endpoint, port, backlog, password);
 
     return 0;
 }
