@@ -63,11 +63,20 @@ namespace fox {
             _server.stop();
         };
 
-        _commands["clearall"] = [this] {
+        _commands["clear"] = [this] {
             spdlog::info("Clearing task queue");
             _mutex.lock();
             _tasks.clear();
             _mutex.unlock();
+        };
+
+        _commands["info"] = [this] {
+            _mutex.lock_shared();
+            spdlog::info("{} tasks queued in total", _tasks.size());
+            _mutex.unlock_shared();
+
+            spdlog::info("{} tasks in total", _total_task_count);
+            spdlog::info("{} tasks processed", _total_processed_count);
         };
     }
 
