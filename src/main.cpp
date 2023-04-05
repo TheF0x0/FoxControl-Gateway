@@ -7,11 +7,16 @@
 #include <string_view>
 #include <kstd/types.hpp>
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 #include <httplib.h>
 #include <nlohmann/json.hpp>
 #include <cxxopts/cxxopts.hpp>
 
 auto main(int num_args, char** args) -> int {
+    spdlog::set_default_logger(spdlog::create<spdlog::sinks::stdout_color_sink_mt>("FoxControl"));
+    spdlog::set_level(spdlog::level::info);
+    spdlog::set_pattern("[%H:%M:%S] [%n] [%^---%L---%$] [thread %t] %v");
+
     auto option_spec = cxxopts::Options("fox-control-gateway", "FoxControl task queueing HTTP gateway server");
 
     // @formatter:off
@@ -22,6 +27,34 @@ auto main(int num_args, char** args) -> int {
         ("a,address", "Specify the address on which to listen for HTTP requests", cxxopts::value<std::string>()->default_value("127.0.0.1"))
         ("p,port", "Specify the port on which to listen for HTTP requests", cxxopts::value<kstd::u32>()->default_value("8080"));
     // @formatter:on
+
+    cxxopts::ParseResult options;
+
+    try {
+        options = option_spec.parse(num_args, args);
+    }
+    catch (const std::exception& error) {
+        spdlog::error("Malformed arguments: {}", error.what());
+        return 1;
+    }
+
+    if (options.count("help") > 0) {
+        std::cout << option_spec.help() << std::endl;
+        return 0;
+    }
+
+    if (options.count("verbose") > 0) {
+        spdlog::set_level(spdlog::level::debug);
+        spdlog::debug("Verbose logging enabled");
+    }
+    else {
+        spdlog::set_level(spdlog::level::info);
+    }
+
+    if (options.count("version") > 0) {
+        spdlog::info("FoxControl Gateway Version 1.0");
+        return 0;
+    }
 
     return 0;
 }
