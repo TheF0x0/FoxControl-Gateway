@@ -24,7 +24,7 @@ auto main(int num_args, char** args) -> int {
         ("v,version", "Show version information")
         ("V,verbose", "Enable verbose logging")
         ("a,address", "Specify the address on which to listen for HTTP requests", cxxopts::value<std::string>()->default_value("127.0.0.1"))
-        ("e,endpoint", "Specify the name of the endpoint to take commands from", cxxopts::value<std::string>())
+        ("e,endpoint", "Specify the name of the endpoint to take commands from", cxxopts::value<std::string>()->default_value("enqueue"))
         ("p,port", "Specify the port on which to listen for HTTP requests", cxxopts::value<kstd::u32>()->default_value("8080"))
         ("b,backlog", "Specify the maximum of tasks that can be queued up internally", cxxopts::value<kstd::u32>()->default_value("500"))
         ("P,password", "Specify the password with which to authenticate against the endpoint for queueing tasks", cxxopts::value<std::string>());

@@ -21,21 +21,19 @@ namespace fox {
             _port(port),
             _backlog(backlog),
             _password(std::move(password)),
+            _is_running(true),
             _total_task_count(0),
             _total_processed_count(0) {
         s_instance = this;
 
-        httplib::Server server;
+        register_commands();
+        _command_thread = std::thread(command_loop, this);
+        run_server();
+    }
 
-        server.set_error_handler(handle_error);
-        server.set_exception_handler(handle_exception);
-
-        server.Get("/status", handle_status);
-        server.Get("/fetch", handle_fetch);
-        server.Post(fmt::format("/{}", _endpoint), handle_endpoint);
-
-        spdlog::info("Listening on {}:{}/{}", _address, _port, _endpoint);
-        server.listen(_address, static_cast<kstd::i32>(_port));
+    Gateway::~Gateway() noexcept {
+        _is_running = false;
+        _command_thread.join();
     }
 
     auto Gateway::dequeue_and_compile() noexcept -> nlohmann::json {
@@ -52,19 +50,85 @@ namespace fox {
         return array;
     }
 
+    auto Gateway::register_commands() noexcept -> void {
+        _commands["help"] = [this] {
+            for (const auto& pair: _commands) {
+                spdlog::info(pair.first);
+            }
+        };
+
+        _commands["exit"] = [this] {
+            spdlog::info("Shutting down gracefully");
+            _is_running = false;
+            _server.stop();
+        };
+
+        _commands["clearall"] = [this] {
+            spdlog::info("Clearing task queue");
+            _mutex.lock();
+            _tasks.clear();
+            _mutex.unlock();
+        };
+    }
+
+    auto Gateway::run_server() noexcept -> void {
+        spdlog::info("Starting HTTP server");
+
+        _server.set_error_handler(handle_error);
+        _server.set_exception_handler(handle_exception);
+
+        _server.Get("/status", handle_status);
+        _server.Get("/fetch", handle_fetch);
+        _server.Post(fmt::format("/{}", _endpoint), handle_endpoint);
+
+        spdlog::info("Listening on {}:{}/{}", _address, _port, _endpoint);
+        _server.listen(_address, static_cast<kstd::i32>(_port)); // This will block
+    }
+
+    auto Gateway::command_loop(Gateway* self) noexcept -> void {
+        using namespace std::chrono_literals;
+
+        spdlog::info("Starting command thread");
+        std::string command;
+
+        while (self->_is_running) {
+            std::getline(std::cin, command);
+
+            if (command.empty()) {
+                continue;
+            }
+
+            const auto itr = self->_commands.find(command);
+
+            if (itr == self->_commands.end()) {
+                spdlog::info("Unrecognized command, try help");
+                continue;
+            }
+
+            itr->second();
+        }
+
+        spdlog::info("Stopping command thread");
+    }
+
     auto Gateway::handle_exception(const httplib::Request& req, httplib::Response& res, std::exception_ptr error_ptr) -> void {
         spdlog::error("Request caused an exception");
         std::string error_message = "Unknown error";
+        bool invalid_password = false;
 
         try {
             std::rethrow_exception(error_ptr); // NOLINT
+        }
+        catch (const AuthenticationError& error) {
+            error_message = error.what();
+            invalid_password = true;
         }
         catch (const std::exception& error) {
             error_message = error.what();
         }
         catch (...) { /* Need to cover this */ }
 
-        res.status = 500;
+        res.status = invalid_password ? 401 : 500;
         res.set_content(fmt::format(R"*(
             <html lang="en">
                 <head>
@@ -148,6 +212,17 @@ namespace fox {
             throw std::runtime_error("Invalid request body type");
         }
 
+        if (!req_body.contains("password")) {
+            throw std::runtime_error("Missing password");
+        }
+
+        auto& self = *s_instance;
+        const auto& password = static_cast<std::string>(req_body["password"]);
+
+        if (password != self._password) {
+            throw AuthenticationError("Invalid password");
+        }
+
         if (!req_body.contains("tasks")) {
             throw std::runtime_error("Missing tasks object");
         }
@@ -158,7 +233,6 @@ namespace fox {
             throw std::runtime_error("Invalid task list type");
         }
 
-        auto& self = *s_instance;
         size_t queued_count = 0;
 
         for (const auto& task: tasks) {
@@ -178,6 +252,6 @@ namespace fox {
         res_body["status"] = queued_count == tasks.size();
 
         res.status = 200;
-        res.set_content("{}", FOX_JSON_MIME_TYPE);
+        res.set_content(res_body, FOX_JSON_MIME_TYPE);
     }
 }

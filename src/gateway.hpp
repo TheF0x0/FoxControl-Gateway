@@ -10,10 +10,19 @@
 #include <shared_mutex>
 #include <vector>
 #include <optional>
+#include <functional>
+#include <exception>
 #include <kstd/types.hpp>
 #include <nlohmann/json.hpp>
+#include <parallel_hashmap/phmap.h>
 
 namespace fox {
+    struct AuthenticationError final : public std::runtime_error {
+        explicit AuthenticationError(const char* message) noexcept:
+                std::runtime_error(message) {
+        }
+    };
+
     enum class Task : kstd::u8 {
         POWER_ON,
         POWER_OFF,
@@ -31,10 +40,18 @@ namespace fox {
         kstd::u32 _backlog;
         std::string _password;
 
+        std::atomic_bool _is_running;
+        std::thread _command_thread;
+        phmap::flat_hash_map<std::string, std::function<void()>> _commands;
+
         std::vector<Task> _tasks;
         std::shared_mutex _mutex;
         std::atomic_size_t _total_task_count;
         std::atomic_size_t _total_processed_count;
+
+        httplib::Server _server;
+
+        static auto command_loop(Gateway* self) noexcept -> void;
 
         static auto handle_exception(const httplib::Request& req, httplib::Response& res, std::exception_ptr error_ptr) -> void;
 
@@ -48,9 +65,15 @@ namespace fox {
 
         [[nodiscard]] auto dequeue_and_compile() noexcept -> nlohmann::json;
 
+        auto register_commands() noexcept -> void;
+
+        auto run_server() noexcept -> void;
+
         public:
 
         Gateway(std::string address, std::string endpoint, kstd::u32 port, kstd::u32 backlog, std::string password) noexcept;
+
+        ~Gateway() noexcept;
 
         inline auto enqueue_task(Task task) noexcept -> bool {
             _mutex.lock();
