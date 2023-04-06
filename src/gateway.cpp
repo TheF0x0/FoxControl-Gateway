@@ -226,7 +226,7 @@ namespace fox {
         }
 
         auto& self = *s_instance;
-        const auto& password = static_cast<std::string>(req_body["password"]);
+        const auto password = static_cast<std::string>(req_body["password"]);
 
         if (password != self._password) {
             throw AuthenticationError("Invalid password");
@@ -261,6 +261,6 @@ namespace fox {
         res_body["status"] = queued_count == tasks.size();
 
         res.status = 200;
-        res.set_content(res_body, FOX_JSON_MIME_TYPE);
+        res.set_content(res_body.dump(), FOX_JSON_MIME_TYPE);
     }
 }
