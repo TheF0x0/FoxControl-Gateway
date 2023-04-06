@@ -44,7 +44,9 @@ namespace fox {
         auto array = nlohmann::json::array();
 
         for (size_t i = 0; i < task_count; ++i) {
-            array.push_back(*dequeue_task());
+            auto task = nlohmann::json::object();
+            dequeue_task()->serialize(task);
+            array.push_back(task);
         }
 
         return array;
@@ -245,20 +247,22 @@ namespace fox {
         size_t queued_count = 0;
 
         for (const auto& task: tasks) {
-            if (!task.is_number()) {
+            if (!task.is_object() || !task.contains("type")) {
                 continue;
             }
 
-            const auto task_index = static_cast<kstd::u32>(task);
+            Task task_dto{};
+            task_dto.deserialize(task);
 
-            if (self.enqueue_task(static_cast<Task>(task_index))) {
-                spdlog::debug("Enqueued task {}", task_index);
+            if (self.enqueue_task(task_dto)) {
+                spdlog::debug("Enqueued task");
                 ++queued_count;
             }
         }
 
         auto res_body = nlohmann::json::object();
         res_body["status"] = queued_count == tasks.size();
+        res_body["queued"] = queued_count;
 
         res.status = 200;
         res.set_content(res_body.dump(), FOX_JSON_MIME_TYPE);

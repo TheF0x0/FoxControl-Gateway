@@ -3,3 +3,4 @@ cmake-build-release/
 .idea/
 .gradle/
 gateway.sh
+debug-gateway.sh

@@ -16,19 +16,13 @@
 #include <nlohmann/json.hpp>
 #include <parallel_hashmap/phmap.h>
 
+#include "dto.hpp"
+
 namespace fox {
     struct AuthenticationError final : public std::runtime_error {
         explicit AuthenticationError(const char* message) noexcept:
                 std::runtime_error(message) {
         }
-    };
-
-    enum class Task : kstd::u8 {
-        POWER_ON,
-        POWER_OFF,
-        SPEED_UP,
-        SPEED_DOWN,
-        CHANGE_MODE
     };
 
     class Gateway final {
