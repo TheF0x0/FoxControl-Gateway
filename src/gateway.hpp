@@ -28,6 +28,8 @@ namespace fox {
     class Gateway final {
         static Gateway* s_instance;
 
+        httplib::Server _server;
+
         std::string _address;
         std::string _endpoint;
         kstd::u32 _port;
@@ -39,11 +41,14 @@ namespace fox {
         phmap::flat_hash_map<std::string, std::function<void()>> _commands;
 
         std::vector<dto::Task> _tasks;
-        std::shared_mutex _mutex;
+        std::shared_mutex _tasks_mutex;
+        dto::DeviceState _state;
+        std::shared_mutex _state_mutex;
+
         std::atomic_size_t _total_task_count;
         std::atomic_size_t _total_processed_count;
 
-        httplib::Server _server;
+        static auto validate_password(const nlohmann::json& json) -> void;
 
         static auto command_loop(Gateway* self) noexcept -> void;
 
@@ -54,6 +59,10 @@ namespace fox {
         static auto handle_status(const httplib::Request& req, httplib::Response& res) -> void;
 
         static auto handle_fetch(const httplib::Request& req, httplib::Response& res) -> void;
+
+        static auto handle_setstate(const httplib::Request& req, httplib::Response& res) -> void;
+
+        static auto handle_getstate(const httplib::Request& req, httplib::Response& res) -> void;
 
         static auto handle_endpoint(const httplib::Request& req, httplib::Response& res) -> void;
 
@@ -70,32 +79,32 @@ namespace fox {
         ~Gateway() noexcept;
 
         inline auto enqueue_task(dto::Task task) noexcept -> bool {
-            _mutex.lock();
+            _tasks_mutex.lock();
 
             if (_tasks.size() >= _backlog) {
-                _mutex.unlock();
+                _tasks_mutex.unlock();
                 return false;
             }
 
             _tasks.push_back(task);
-            _mutex.unlock();
+            _tasks_mutex.unlock();
 
             ++_total_task_count;
             return true;
         }
 
         inline auto dequeue_task() noexcept -> std::optional<dto::Task> {
-            _mutex.lock();
+            _tasks_mutex.lock();
             const auto front = _tasks.begin();
 
             if (front == _tasks.end()) {
-                _mutex.unlock();
+                _tasks_mutex.unlock();
                 return std::nullopt;
             }
 
             const auto result = *front;
             _tasks.erase(front);
-            _mutex.unlock();
+            _tasks_mutex.unlock();
 
             ++_total_processed_count;
 

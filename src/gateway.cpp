@@ -22,6 +22,7 @@ namespace fox {
             _backlog(backlog),
             _password(std::move(password)),
             _is_running(true),
+            _state(),
             _total_task_count(0),
             _total_processed_count(0) {
         s_instance = this;
@@ -37,9 +38,9 @@ namespace fox {
     }
 
     auto Gateway::dequeue_and_compile() noexcept -> nlohmann::json {
-        _mutex.lock_shared();
+        _tasks_mutex.lock_shared();
         const auto task_count = _tasks.size();
-        _mutex.unlock_shared();
+        _tasks_mutex.unlock_shared();
 
         auto array = nlohmann::json::array();
 
@@ -67,15 +68,15 @@ namespace fox {
 
         _commands["clear"] = [this] {
             spdlog::info("Clearing task queue");
-            _mutex.lock();
+            _tasks_mutex.lock();
             _tasks.clear();
-            _mutex.unlock();
+            _tasks_mutex.unlock();
         };
 
         _commands["info"] = [this] {
-            _mutex.lock_shared();
+            _tasks_mutex.lock_shared();
             spdlog::info("{} tasks queued in total", _tasks.size());
-            _mutex.unlock_shared();
+            _tasks_mutex.unlock_shared();
 
             spdlog::info("{} tasks in total", _total_task_count);
             spdlog::info("{} tasks processed", _total_processed_count);
@@ -90,10 +91,25 @@ namespace fox {
 
         _server.Get("/status", handle_status);
         _server.Get("/fetch", handle_fetch);
+        _server.Get("/getstate", handle_getstate);
+        _server.Post("/setstate", handle_setstate);
         _server.Post(fmt::format("/{}", _endpoint), handle_endpoint);
 
         spdlog::info("Listening on {}:{}/{}", _address, _port, _endpoint);
         _server.listen(_address, static_cast<kstd::i32>(_port)); // This will block
+    }
+
+    auto Gateway::validate_password(const nlohmann::json& json) -> void {
+        if (!json.contains("password")) {
+            throw std::runtime_error("Missing password");
+        }
+
+        auto& self = *s_instance;
+        const auto& password = static_cast<std::string>(json["password"]);
+
+        if (password != self._password) {
+            throw AuthenticationError("Invalid password");
+        }
     }
 
     auto Gateway::command_loop(Gateway* self) noexcept -> void {
@@ -177,9 +193,16 @@ namespace fox {
         spdlog::debug("Received status request");
         auto& self = *s_instance;
 
-        self._mutex.lock_shared();
+        self._tasks_mutex.lock_shared();
         const auto task_count = self._tasks.size();
-        self._mutex.unlock_shared();
+        self._tasks_mutex.unlock_shared();
+
+        self._state_mutex.lock_shared();
+        const auto is_on = self._state.is_on;
+        const auto target_speed = self._state.target_speed;
+        const auto actual_speed = self._state.actual_speed;
+        const auto mode = self._state.mode;
+        self._state_mutex.unlock_shared();
 
         const auto total_task_count = static_cast<size_t>(self._total_task_count);
         const auto total_processed_count = static_cast<size_t>(self._total_processed_count);
@@ -193,12 +216,20 @@ namespace fox {
                 </head>
                 <body>
                     <h1>🦊 Status</h1>
+                    <hr>
+                    <h2>Task Queue</h2>
                     <h3>Queued Tasks: {}</h3>
                     <h3>Total Tasks: {}</h3>
                     <h3>Total Processed: {}</h3>
+                    <hr>
+                    <h2>Device State</h2>
+                    <h3>Is On: {}</h3>
+                    <h3>Target Speed: {}</h3>
+                    <h3>Actual Speed: {}</h3>
+                    <h3>Mode: {}</h3>
                 </body>
             </html>
-        )*", task_count, total_task_count, total_processed_count), FOX_HTML_MIME_TYPE);
+        )*", task_count, total_task_count, total_processed_count, is_on, target_speed, actual_speed, static_cast<kstd::u8>(mode)), FOX_HTML_MIME_TYPE);
     }
 
     auto Gateway::handle_fetch(const httplib::Request& req, httplib::Response& res) -> void {
@@ -213,8 +244,50 @@ namespace fox {
         res.set_content(res_body.dump(), FOX_JSON_MIME_TYPE);
     }
 
+    auto Gateway::handle_setstate(const httplib::Request& req, httplib::Response& res) -> void {
+        spdlog::debug("Received setstate request");
+
+        auto& self = *s_instance;
+        const auto req_body = nlohmann::json::parse(req.body);
+
+        if (!req_body.is_object()) {
+            throw std::runtime_error("Invalid request body type");
+        }
+
+        validate_password(req_body);
+
+        if (!req_body.contains("state")) {
+            throw std::runtime_error("Missing state object");
+        }
+
+        const auto& state_obj = req_body["state"];
+
+        if (!state_obj.is_object()) {
+            throw std::runtime_error("Invalid state object type");
+        }
+
+        self._state_mutex.lock();
+        self._state.deserialize(state_obj);
+        self._state_mutex.unlock();
+
+        res.status = 200;
+    }
+
+    auto Gateway::handle_getstate(const httplib::Request& req, httplib::Response& res) -> void {
+        spdlog::debug("Received getstate request");
+
+        auto& self = *s_instance;
+
+        auto res_body = nlohmann::json::object();
+        self._state_mutex.lock_shared();
+        self._state.serialize(res_body);
+        self._state_mutex.unlock_shared();
+
+        res.status = 200;
+        res.set_content(res_body.dump(), FOX_JSON_MIME_TYPE);
+    }
+
     auto Gateway::handle_endpoint(const httplib::Request& req, httplib::Response& res) -> void {
-        using namespace nlohmann::literals;
         spdlog::debug("Received endpoint request");
 
         const auto req_body = nlohmann::json::parse(req.body);
@@ -223,16 +296,7 @@ namespace fox {
             throw std::runtime_error("Invalid request body type");
         }
 
-        if (!req_body.contains("password")) {
-            throw std::runtime_error("Missing password");
-        }
-
-        auto& self = *s_instance;
-        const auto& password = static_cast<std::string>(req_body["password"]);
-
-        if (password != self._password) {
-            throw AuthenticationError("Invalid password");
-        }
+        validate_password(req_body);
 
         if (!req_body.contains("tasks")) {
             throw std::runtime_error("Missing tasks object");
@@ -244,6 +308,7 @@ namespace fox {
             throw std::runtime_error("Invalid task list type");
         }
 
+        auto& self = *s_instance;
         size_t queued_count = 0;
 
         for (const auto& task: tasks) {
