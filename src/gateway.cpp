@@ -156,6 +156,8 @@ namespace fox {
         catch (...) { /* Need to cover this */ }
 
         res.status = invalid_password ? 401 : 500;
+        res.set_header("Access-Control-Allow-Origin", "*");
+
         res.set_content(fmt::format(R"*(
             <html lang="en">
                 <head>
@@ -175,6 +177,8 @@ namespace fox {
         spdlog::warn("Received invalid request");
 
         res.status = 404;
+        res.set_header("Access-Control-Allow-Origin", "*");
+
         res.set_content(R"*(
             <html lang="en">
                 <head>
@@ -208,6 +212,8 @@ namespace fox {
         const auto total_processed_count = static_cast<size_t>(self._total_processed_count);
 
         res.status = 200;
+        res.set_header("Access-Control-Allow-Origin", "*");
+
         res.set_content(fmt::format(R"*(
             <html lang="en">
                 <head>
@@ -241,6 +247,7 @@ namespace fox {
         res_body["tasks"] = self.dequeue_and_compile();
 
         res.status = 200;
+        res.set_header("Access-Control-Allow-Origin", "*");
         res.set_content(res_body.dump(), FOX_JSON_MIME_TYPE);
     }
 
@@ -271,6 +278,7 @@ namespace fox {
         self._state_mutex.unlock();
 
         res.status = 200;
+        res.set_header("Access-Control-Allow-Origin", "*");
     }
 
     auto Gateway::handle_getstate(const httplib::Request& req, httplib::Response& res) -> void {
@@ -284,6 +292,7 @@ namespace fox {
         self._state_mutex.unlock_shared();
 
         res.status = 200;
+        res.set_header("Access-Control-Allow-Origin", "*");
         res.set_content(res_body.dump(), FOX_JSON_MIME_TYPE);
     }
 
@@ -330,6 +339,7 @@ namespace fox {
         res_body["queued"] = queued_count;
 
         res.status = 200;
+        res.set_header("Access-Control-Allow-Origin", "*");
         res.set_content(res_body.dump(), FOX_JSON_MIME_TYPE);
     }
 }
