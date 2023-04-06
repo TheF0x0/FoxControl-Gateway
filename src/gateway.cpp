@@ -90,12 +90,17 @@ namespace fox {
         _server.set_exception_handler(handle_exception);
 
         _server.Get("/status", handle_status);
-        _server.Get("/fetch", handle_fetch);
         _server.Get("/getstate", handle_getstate);
+        _server.Post("/authenticate", handle_authenticate);
+        _server.Post("/fetch", handle_fetch);
         _server.Post("/setstate", handle_setstate);
         _server.Post(fmt::format("/{}", _endpoint), handle_enqueue);
 
-        _server.set_default_headers({std::make_pair("Access-Control-Allow-Origin", "*"), std::make_pair("Access-Control-Allow-Methods", "*"), std::make_pair("Access-Control-Allow-Headers", "*")});
+        _server.set_default_headers({ // @formatter:off
+            std::make_pair("Access-Control-Allow-Origin", "*"),
+            std::make_pair("Access-Control-Allow-Methods", "*"),
+            std::make_pair("Access-Control-Allow-Headers", "*")
+        }); // @formatter:on
 
         spdlog::info("Listening on {}:{}/{}", _address, _port, _endpoint);
         _server.listen(_address, static_cast<kstd::i32>(_port)); // This will block
@@ -193,6 +198,27 @@ namespace fox {
         )*", FOX_HTML_MIME_TYPE);
     }
 
+    auto Gateway::handle_authenticate(const httplib::Request& req, httplib::Response& res) -> void {
+        spdlog::warn("Received authenticate request");
+
+        auto req_body = nlohmann::json::parse(req.body);
+        auto res_body = nlohmann::json::object();
+
+        try {
+            validate_password(req_body);
+            res_body["status"] = true;
+        }
+        catch (const std::exception& error) {
+            res_body["status"] = false;
+            res_body["error"] = std::string(error.what());
+            return;
+        }
+        catch (...) { /* Need to cover these */ }
+
+        res.status = 200;
+        res.set_content(res_body.dump(), FOX_JSON_MIME_TYPE);
+    }
+
     auto Gateway::handle_status(const httplib::Request& req, httplib::Response& res) -> void {
         spdlog::debug("Received status request");
         auto& self = *s_instance;
@@ -242,6 +268,14 @@ namespace fox {
         spdlog::debug("Received fetch request");
 
         auto& self = *s_instance;
+        auto req_body = nlohmann::json::parse(req.body);
+
+        if (!req_body.is_object()) {
+            throw std::runtime_error("Invalid request body type");
+        }
+
+        validate_password(req_body);
+
         auto res_body = nlohmann::json::object();
         res_body["tasks"] = self.dequeue_and_compile();
 

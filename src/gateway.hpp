@@ -56,6 +56,8 @@ namespace fox {
 
         static auto handle_error(const httplib::Request& req, httplib::Response& res) -> void;
 
+        static auto handle_authenticate(const httplib::Request& req, httplib::Response& res) -> void;
+
         static auto handle_status(const httplib::Request& req, httplib::Response& res) -> void;
 
         static auto handle_fetch(const httplib::Request& req, httplib::Response& res) -> void;
