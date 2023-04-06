@@ -93,7 +93,7 @@ namespace fox {
         _server.Get("/fetch", handle_fetch);
         _server.Get("/getstate", handle_getstate);
         _server.Post("/setstate", handle_setstate);
-        _server.Post(fmt::format("/{}", _endpoint), handle_endpoint);
+        _server.Post(fmt::format("/{}", _endpoint), handle_enqueue);
 
         spdlog::info("Listening on {}:{}/{}", _address, _port, _endpoint);
         _server.listen(_address, static_cast<kstd::i32>(_port)); // This will block
@@ -157,6 +157,8 @@ namespace fox {
 
         res.status = invalid_password ? 401 : 500;
         res.set_header("Access-Control-Allow-Origin", "*");
+        res.set_header("Access-Control-Allow-Methods", "GET");
+        res.set_header("Access-Control-Allow-Headers", "Origin, Content-Type, X-Auth-Token");
 
         res.set_content(fmt::format(R"*(
             <html lang="en">
@@ -178,6 +180,8 @@ namespace fox {
 
         res.status = 404;
         res.set_header("Access-Control-Allow-Origin", "*");
+        res.set_header("Access-Control-Allow-Methods", "GET");
+        res.set_header("Access-Control-Allow-Headers", "Origin, Content-Type, X-Auth-Token");
 
         res.set_content(R"*(
             <html lang="en">
@@ -213,6 +217,8 @@ namespace fox {
 
         res.status = 200;
         res.set_header("Access-Control-Allow-Origin", "*");
+        res.set_header("Access-Control-Allow-Methods", "GET");
+        res.set_header("Access-Control-Allow-Headers", "Origin, Content-Type, X-Auth-Token");
 
         res.set_content(fmt::format(R"*(
             <html lang="en">
@@ -248,6 +254,8 @@ namespace fox {
 
         res.status = 200;
         res.set_header("Access-Control-Allow-Origin", "*");
+        res.set_header("Access-Control-Allow-Methods", "GET");
+        res.set_header("Access-Control-Allow-Headers", "Origin, Content-Type, X-Auth-Token");
         res.set_content(res_body.dump(), FOX_JSON_MIME_TYPE);
     }
 
@@ -279,6 +287,8 @@ namespace fox {
 
         res.status = 200;
         res.set_header("Access-Control-Allow-Origin", "*");
+        res.set_header("Access-Control-Allow-Methods", "POST");
+        res.set_header("Access-Control-Allow-Headers", "Origin, Content-Type, X-Auth-Token");
     }
 
     auto Gateway::handle_getstate(const httplib::Request& req, httplib::Response& res) -> void {
@@ -293,10 +303,12 @@ namespace fox {
 
         res.status = 200;
         res.set_header("Access-Control-Allow-Origin", "*");
+        res.set_header("Access-Control-Allow-Methods", "GET");
+        res.set_header("Access-Control-Allow-Headers", "Origin, Content-Type, X-Auth-Token");
         res.set_content(res_body.dump(), FOX_JSON_MIME_TYPE);
     }
 
-    auto Gateway::handle_endpoint(const httplib::Request& req, httplib::Response& res) -> void {
+    auto Gateway::handle_enqueue(const httplib::Request& req, httplib::Response& res) -> void {
         spdlog::debug("Received endpoint request");
 
         const auto req_body = nlohmann::json::parse(req.body);
@@ -340,6 +352,8 @@ namespace fox {
 
         res.status = 200;
         res.set_header("Access-Control-Allow-Origin", "*");
+        res.set_header("Access-Control-Allow-Methods", "POST");
+        res.set_header("Access-Control-Allow-Headers", "Origin, Content-Type, X-Auth-Token");
         res.set_content(res_body.dump(), FOX_JSON_MIME_TYPE);
     }
 }

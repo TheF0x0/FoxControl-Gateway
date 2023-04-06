@@ -64,7 +64,7 @@ namespace fox {
 
         static auto handle_getstate(const httplib::Request& req, httplib::Response& res) -> void;
 
-        static auto handle_endpoint(const httplib::Request& req, httplib::Response& res) -> void;
+        static auto handle_enqueue(const httplib::Request& req, httplib::Response& res) -> void;
 
         [[nodiscard]] auto dequeue_and_compile() noexcept -> nlohmann::json;
 
