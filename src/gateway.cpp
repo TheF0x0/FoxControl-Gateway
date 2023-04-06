@@ -251,7 +251,7 @@ namespace fox {
                 continue;
             }
 
-            Task task_dto{};
+            dto::Task task_dto{};
             task_dto.deserialize(task);
 
             if (self.enqueue_task(task_dto)) {

@@ -38,7 +38,7 @@ namespace fox {
         std::thread _command_thread;
         phmap::flat_hash_map<std::string, std::function<void()>> _commands;
 
-        std::vector<Task> _tasks;
+        std::vector<dto::Task> _tasks;
         std::shared_mutex _mutex;
         std::atomic_size_t _total_task_count;
         std::atomic_size_t _total_processed_count;
@@ -69,7 +69,7 @@ namespace fox {
 
         ~Gateway() noexcept;
 
-        inline auto enqueue_task(Task task) noexcept -> bool {
+        inline auto enqueue_task(dto::Task task) noexcept -> bool {
             _mutex.lock();
 
             if (_tasks.size() >= _backlog) {
@@ -84,7 +84,7 @@ namespace fox {
             return true;
         }
 
-        inline auto dequeue_task() noexcept -> std::optional<Task> {
+        inline auto dequeue_task() noexcept -> std::optional<dto::Task> {
             _mutex.lock();
             const auto front = _tasks.begin();
 

@@ -8,7 +8,7 @@
 #include <kstd/types.hpp>
 #include <nlohmann/json.hpp>
 
-namespace fox {
+namespace fox::dto {
     enum class TaskType : kstd::u8 {
         POWER,
         SPEED,
