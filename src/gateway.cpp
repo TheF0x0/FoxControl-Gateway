@@ -95,6 +95,8 @@ namespace fox {
         _server.Post("/setstate", handle_setstate);
         _server.Post(fmt::format("/{}", _endpoint), handle_enqueue);
 
+        _server.set_default_headers({std::make_pair("Access-Control-Allow-Origin", "*"), std::make_pair("Access-Control-Allow-Methods", "*"), std::make_pair("Access-Control-Allow-Headers", "*")});
+
         spdlog::info("Listening on {}:{}/{}", _address, _port, _endpoint);
         _server.listen(_address, static_cast<kstd::i32>(_port)); // This will block
     }
@@ -156,9 +158,6 @@ namespace fox {
         catch (...) { /* Need to cover this */ }
 
         res.status = invalid_password ? 401 : 500;
-        res.set_header("Access-Control-Allow-Origin", "*");
-        res.set_header("Access-Control-Allow-Methods", "GET");
-        res.set_header("Access-Control-Allow-Headers", "Origin, Content-Type, X-Auth-Token");
 
         res.set_content(fmt::format(R"*(
             <html lang="en">
@@ -179,9 +178,6 @@ namespace fox {
         spdlog::warn("Received invalid request");
 
         res.status = 404;
-        res.set_header("Access-Control-Allow-Origin", "*");
-        res.set_header("Access-Control-Allow-Methods", "GET");
-        res.set_header("Access-Control-Allow-Headers", "Origin, Content-Type, X-Auth-Token");
 
         res.set_content(R"*(
             <html lang="en">
@@ -216,9 +212,6 @@ namespace fox {
         const auto total_processed_count = static_cast<size_t>(self._total_processed_count);
 
         res.status = 200;
-        res.set_header("Access-Control-Allow-Origin", "*");
-        res.set_header("Access-Control-Allow-Methods", "GET");
-        res.set_header("Access-Control-Allow-Headers", "Origin, Content-Type, X-Auth-Token");
 
         res.set_content(fmt::format(R"*(
             <html lang="en">
@@ -253,9 +246,6 @@ namespace fox {
         res_body["tasks"] = self.dequeue_and_compile();
 
         res.status = 200;
-        res.set_header("Access-Control-Allow-Origin", "*");
-        res.set_header("Access-Control-Allow-Methods", "GET");
-        res.set_header("Access-Control-Allow-Headers", "Origin, Content-Type, X-Auth-Token");
         res.set_content(res_body.dump(), FOX_JSON_MIME_TYPE);
     }
 
@@ -286,9 +276,6 @@ namespace fox {
         self._state_mutex.unlock();
 
         res.status = 200;
-        res.set_header("Access-Control-Allow-Origin", "*");
-        res.set_header("Access-Control-Allow-Methods", "POST");
-        res.set_header("Access-Control-Allow-Headers", "Origin, Content-Type, X-Auth-Token");
     }
 
     auto Gateway::handle_getstate(const httplib::Request& req, httplib::Response& res) -> void {
@@ -302,9 +289,6 @@ namespace fox {
         self._state_mutex.unlock_shared();
 
         res.status = 200;
-        res.set_header("Access-Control-Allow-Origin", "*");
-        res.set_header("Access-Control-Allow-Methods", "GET");
-        res.set_header("Access-Control-Allow-Headers", "Origin, Content-Type, X-Auth-Token");
         res.set_content(res_body.dump(), FOX_JSON_MIME_TYPE);
     }
 
@@ -351,9 +335,6 @@ namespace fox {
         res_body["queued"] = queued_count;
 
         res.status = 200;
-        res.set_header("Access-Control-Allow-Origin", "*");
-        res.set_header("Access-Control-Allow-Methods", "POST");
-        res.set_header("Access-Control-Allow-Headers", "Origin, Content-Type, X-Auth-Token");
         res.set_content(res_body.dump(), FOX_JSON_MIME_TYPE);
     }
 }
