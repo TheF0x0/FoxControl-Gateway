@@ -228,7 +228,7 @@ namespace fox {
         }
 
         auto& self = *s_instance;
-        const auto password = static_cast<std::string>(req_body["password"]);
+        const auto& password = static_cast<std::string>(req_body["password"]);
 
         if (password != self._password) {
             throw AuthenticationError("Invalid password");
