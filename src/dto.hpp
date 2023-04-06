@@ -1,5 +1,5 @@
 /**
- * @author Alexander Hinze
+ * @author TheF0x0
  * @since 06/04/2023
  */
 
