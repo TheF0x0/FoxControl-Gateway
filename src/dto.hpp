@@ -36,7 +36,7 @@ namespace fox::dto {
 
     struct SpeedTask final {
         TaskType type;
-        kstd::u32 speed;
+        kstd::i32 speed;
 
         inline auto serialize(nlohmann::json& json) noexcept -> void {
             json["type"] = type;
@@ -45,7 +45,7 @@ namespace fox::dto {
 
         inline auto deserialize(const nlohmann::json& json) noexcept -> void {
             type = static_cast<TaskType>(json["type"]);
-            speed = static_cast<kstd::u32>(json["speed"]);
+            speed = static_cast<kstd::i32>(json["speed"]);
         }
     };
 
