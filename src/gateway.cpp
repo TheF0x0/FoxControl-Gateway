@@ -87,7 +87,6 @@ namespace fox {
         spdlog::info("Starting HTTP server");
 
         _server.set_error_handler(handle_error);
-        _server.set_exception_handler(handle_exception);
 
         _server.Get("/status", handle_status);
         _server.Get("/getstate", handle_getstate);
@@ -106,17 +105,29 @@ namespace fox {
         _server.listen(_address, static_cast<kstd::i32>(_port)); // This will block
     }
 
-    auto Gateway::validate_password(const nlohmann::json& json) -> void {
+    auto Gateway::send_error(httplib::Response& res, kstd::i32 status, const std::string_view& message) noexcept -> void {
+        auto res_body = nlohmann::json::object();
+
+        res_body["status"] = false;
+        res_body["error"] = message;
+
+        res.status = status;
+        res.set_content(res_body.dump(), FOX_JSON_MIME_TYPE);
+    }
+
+    auto Gateway::validate_password(const nlohmann::json& json) -> bool {
         if (!json.contains("password")) {
-            throw std::runtime_error("Missing password");
+            return false;
         }
 
         auto& self = *s_instance;
         const auto& password = static_cast<std::string>(json["password"]);
 
         if (password != self._password) {
-            throw AuthenticationError("Invalid password");
+            return false;
         }
+
+        return true;
     }
 
     auto Gateway::command_loop(Gateway* self) noexcept -> void {
@@ -145,40 +156,6 @@ namespace fox {
         spdlog::info("Stopping command thread");
     }
 
-    auto Gateway::handle_exception(const httplib::Request& req, httplib::Response& res, std::exception_ptr error_ptr) -> void {
-        spdlog::error("Request caused an exception");
-        std::string error_message = "Unknown error";
-        bool invalid_password = false;
-
-        try {
-            std::rethrow_exception(error_ptr); // NOLINT
-        }
-        catch (const AuthenticationError& error) {
-            error_message = error.what();
-            invalid_password = true;
-        }
-        catch (const std::exception& error) {
-            error_message = error.what();
-        }
-        catch (...) { /* Need to cover this */ }
-
-        res.status = invalid_password ? 401 : 500;
-
-        res.set_content(fmt::format(R"*(
-            <html lang="en">
-                <head>
-                    <title>🦊 Oops..</title>
-                    <meta charset="UTF-8" />
-                </head>
-                <body>
-                    <h1>Something broke 🦊</h1>
-                    <h3>Something went horribly wrong while processing your request.<h3>
-                    {}
-                </body>
-            </html>
-        )*", error_message), FOX_HTML_MIME_TYPE);
-    }
-
     auto Gateway::handle_error(const httplib::Request& req, httplib::Response& res) -> void {
         spdlog::warn("Received invalid request");
 
@@ -202,18 +179,9 @@ namespace fox {
         spdlog::warn("Received authenticate request");
 
         auto req_body = nlohmann::json::parse(req.body);
-        auto res_body = nlohmann::json::object();
 
-        try {
-            validate_password(req_body);
-            res_body["status"] = true;
-        }
-        catch (const std::exception& error) {
-            res_body["status"] = false;
-            res_body["error"] = std::string(error.what());
-            return;
-        }
-        catch (...) { /* Need to cover these */ }
+        auto res_body = nlohmann::json::object();
+        res_body["status"] = validate_password(req_body);
 
         res.status = 200;
         res.set_content(res_body.dump(), FOX_JSON_MIME_TYPE);
@@ -228,6 +196,7 @@ namespace fox {
         self._tasks_mutex.unlock_shared();
 
         self._state_mutex.lock_shared();
+        const auto is_online = self._state.is_online;
         const auto is_on = self._state.is_on;
         const auto target_speed = self._state.target_speed;
         const auto actual_speed = self._state.actual_speed;
@@ -254,13 +223,14 @@ namespace fox {
                     <h3>Total Processed: {}</h3>
                     <hr>
                     <h2>Device State</h2>
+                    <h3>Is Online: {}</h3>
                     <h3>Is On: {}</h3>
                     <h3>Target Speed: {}</h3>
                     <h3>Actual Speed: {}</h3>
                     <h3>Mode: {}</h3>
                 </body>
             </html>
-        )*", task_count, total_task_count, total_processed_count, is_on, target_speed, actual_speed, static_cast<kstd::u8>(mode)), FOX_HTML_MIME_TYPE);
+        )*", task_count, total_task_count, total_processed_count, is_online, is_on, target_speed, actual_speed, static_cast<kstd::u8>(mode)), FOX_HTML_MIME_TYPE);
     }
 
     auto Gateway::handle_fetch(const httplib::Request& req, httplib::Response& res) -> void {
@@ -271,10 +241,14 @@ namespace fox {
         auto req_body = nlohmann::json::parse(req.body);
 
         if (!req_body.is_object()) {
-            throw std::runtime_error("Invalid request body type");
+            send_error(res, 500, "Invalid request body type");
+            return;
         }
 
-        validate_password(req_body);
+        if(!validate_password(req_body)) {
+            send_error(res, 401, "Invalid password");
+            return;
+        }
 
         auto res_body = nlohmann::json::object();
         res_body["tasks"] = self.dequeue_and_compile();
@@ -290,19 +264,25 @@ namespace fox {
         const auto req_body = nlohmann::json::parse(req.body);
 
         if (!req_body.is_object()) {
-            throw std::runtime_error("Invalid request body type");
+            send_error(res, 500, "Invalid request body type");
+            return;
         }
 
-        validate_password(req_body);
+        if(!validate_password(req_body)) {
+            send_error(res, 401, "Invalid password");
+            return;
+        }
 
         if (!req_body.contains("state")) {
-            throw std::runtime_error("Missing state object");
+            send_error(res, 500, "Missing state object");
+            return;
         }
 
         const auto& state_obj = req_body["state"];
 
         if (!state_obj.is_object()) {
-            throw std::runtime_error("Invalid state object type");
+            send_error(res, 500, "Invalid state object type");
+            return;
         }
 
         self._state_mutex.lock();
@@ -332,19 +312,25 @@ namespace fox {
         const auto req_body = nlohmann::json::parse(req.body);
 
         if (!req_body.is_object()) {
-            throw std::runtime_error("Invalid request body type");
+            send_error(res, 500, "Invalid request body type");
+            return;
         }
 
-        validate_password(req_body);
+        if(!validate_password(req_body)) {
+            send_error(res, 401, "Invalid password");
+            return;
+        }
 
         if (!req_body.contains("tasks")) {
-            throw std::runtime_error("Missing tasks object");
+            send_error(res, 500, "Missing tasks list");
+            return;
         }
 
         const auto& tasks = req_body["tasks"];
 
         if (!tasks.is_array()) {
-            throw std::runtime_error("Invalid task list type");
+            send_error(res, 500, "Invalid tasks list type");
+            return;
         }
 
         auto& self = *s_instance;

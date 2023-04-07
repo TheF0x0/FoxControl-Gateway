@@ -48,11 +48,11 @@ namespace fox {
         std::atomic_size_t _total_task_count;
         std::atomic_size_t _total_processed_count;
 
-        static auto validate_password(const nlohmann::json& json) -> void;
+        static auto send_error(httplib::Response& res, kstd::i32 status, const std::string_view& message) noexcept -> void;
+
+        static auto validate_password(const nlohmann::json& json) -> bool;
 
         static auto command_loop(Gateway* self) noexcept -> void;
-
-        static auto handle_exception(const httplib::Request& req, httplib::Response& res, std::exception_ptr error_ptr) -> void;
 
         static auto handle_error(const httplib::Request& req, httplib::Response& res) -> void;
 

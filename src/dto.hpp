@@ -100,12 +100,14 @@ namespace fox::dto {
     };
 
     struct DeviceState final {
+        bool is_online;
         bool is_on;
         kstd::u32 target_speed;
         kstd::u32 actual_speed;
         Mode mode;
 
         inline auto serialize(nlohmann::json& json) noexcept -> void {
+            json["is_online"] = is_online;
             json["is_on"] = is_on;
             json["target_speed"] = target_speed;
             json["actual_speed"] = actual_speed;
@@ -113,6 +115,7 @@ namespace fox::dto {
         }
 
         inline auto deserialize(const nlohmann::json& json) noexcept -> void {
+            is_online = json["is_online"];
             is_on = json["is_on"];
             target_speed = json["target_speed"];
             actual_speed = json["actual_speed"];
