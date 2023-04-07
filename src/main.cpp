@@ -54,7 +54,7 @@ auto main(int num_args, char** args) -> int {
     }
 
     if (options.count("version") > 0) {
-        spdlog::info("FoxControl Gateway Version 1.4");
+        spdlog::info("FoxControl Gateway Version 1.6");
         return 0;
     }
 

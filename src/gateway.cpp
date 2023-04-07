@@ -90,7 +90,7 @@ namespace fox {
         _server.set_error_handler(handle_error);
 
         _server.Get("/status", handle_status);
-        _server.Get("/getstate", handle_getstate);
+        _server.Post("/getstate", handle_getstate);
         _server.Post("/authenticate", handle_authenticate);
         _server.Post("/fetch", handle_fetch);
         _server.Post("/setstate", handle_setstate);
@@ -178,7 +178,7 @@ namespace fox {
     }
 
     auto Gateway::handle_authenticate(const httplib::Request& req, httplib::Response& res) -> void {
-        spdlog::warn("Received authenticate request");
+        spdlog::debug("Received authenticate request");
 
         auto req_body = nlohmann::json::parse(req.body);
 
@@ -330,6 +330,18 @@ namespace fox {
         spdlog::debug("Received getstate request");
 
         auto& self = *s_instance;
+
+        const auto req_body = nlohmann::json::parse(req.body);
+
+        if (!req_body.is_object()) {
+            send_error(res, 500, "Invalid request body type");
+            return;
+        }
+
+        if (!validate_password(req_body)) {
+            send_error(res, 401, "Invalid password");
+            return;
+        }
 
         auto res_body = nlohmann::json::object();
         self._state_mutex.lock_shared();
