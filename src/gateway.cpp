@@ -22,6 +22,7 @@ namespace fox {
             _backlog(backlog),
             _password(std::move(password)),
             _is_running(true),
+            _is_online(false),
             _state(),
             _total_task_count(0),
             _total_processed_count(0) {
@@ -197,7 +198,6 @@ namespace fox {
         self._tasks_mutex.unlock_shared();
 
         self._state_mutex.lock_shared();
-        const auto is_online = self._state.is_online;
         const auto is_on = self._state.is_on;
         const auto target_speed = self._state.target_speed;
         const auto actual_speed = self._state.actual_speed;
@@ -231,7 +231,7 @@ namespace fox {
                     <h3>Mode: {}</h3>
                 </body>
             </html>
-        )*", task_count, total_task_count, total_processed_count, is_online, is_on, target_speed, actual_speed, static_cast<kstd::u8>(mode)), FOX_HTML_MIME_TYPE);
+        )*", task_count, total_task_count, total_processed_count, self._is_online, is_on, target_speed, actual_speed, static_cast<kstd::u8>(mode)), FOX_HTML_MIME_TYPE);
     }
 
     auto Gateway::handle_fetch(const httplib::Request& req, httplib::Response& res) -> void {
@@ -246,7 +246,7 @@ namespace fox {
             return;
         }
 
-        if(!validate_password(req_body)) {
+        if (!validate_password(req_body)) {
             send_error(res, 401, "Invalid password");
             return;
         }
@@ -261,30 +261,31 @@ namespace fox {
     auto Gateway::handle_setonline(const httplib::Request& req, httplib::Response& res) -> void {
         auto req_body = nlohmann::json::parse(req.body);
 
-        if(!req_body.is_object()) {
+        if (!req_body.is_object()) {
             send_error(res, 500, "Invalid request body type");
             return;
         }
 
-        if(!validate_password(req_body)) {
+        if (!validate_password(req_body)) {
             send_error(res, 401, "Invalid password");
             return;
         }
 
-        if(!req_body.contains("is_online")) {
+        if (!req_body.contains("is_online")) {
             send_error(res, 500, "Invalid property type");
             return;
         }
 
-        auto& state = s_instance->_state;
-        const auto previous_state = state.is_online;
+        auto& self = *s_instance;
+
+        const auto previous_state = static_cast<bool>(self._is_online);
         const auto new_state = req_body["is_online"];
 
         auto res_body = nlohmann::json::object();
         res_body["status"] = new_state != previous_state;
         res_body["previous"] = previous_state;
 
-        state.is_online = new_state;
+        self._is_online = new_state;
 
         res.status = 200;
         res.set_content(res_body.dump(), FOX_JSON_MIME_TYPE);
@@ -301,7 +302,7 @@ namespace fox {
             return;
         }
 
-        if(!validate_password(req_body)) {
+        if (!validate_password(req_body)) {
             send_error(res, 401, "Invalid password");
             return;
         }
@@ -335,6 +336,8 @@ namespace fox {
         self._state.serialize(res_body);
         self._state_mutex.unlock_shared();
 
+        res_body["is_online"] = static_cast<bool>(self._is_online);
+
         res.status = 200;
         res.set_content(res_body.dump(), FOX_JSON_MIME_TYPE);
     }
@@ -349,7 +352,7 @@ namespace fox {
             return;
         }
 
-        if(!validate_password(req_body)) {
+        if (!validate_password(req_body)) {
             send_error(res, 401, "Invalid password");
             return;
         }

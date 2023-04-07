@@ -40,6 +40,7 @@ namespace fox {
         std::thread _command_thread;
         phmap::flat_hash_map<std::string, std::function<void()>> _commands;
 
+        std::atomic_bool _is_online;
         std::vector<dto::Task> _tasks;
         std::shared_mutex _tasks_mutex;
         dto::DeviceState _state;

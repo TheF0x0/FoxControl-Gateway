@@ -8,6 +8,9 @@
 #include <kstd/types.hpp>
 #include <nlohmann/json.hpp>
 
+#define FOX_JSON_SET(j, x) j[#x] = x
+#define FOX_JSON_GET(j, x) x = j[#x]
+
 namespace fox::dto {
     enum class TaskType : kstd::u8 {
         POWER,
@@ -24,13 +27,13 @@ namespace fox::dto {
         bool is_on;
 
         inline auto serialize(nlohmann::json& json) noexcept -> void {
-            json["type"] = type;
-            json["is_on"] = is_on;
+            FOX_JSON_SET(json, type);
+            FOX_JSON_SET(json, is_on);
         }
 
         inline auto deserialize(const nlohmann::json& json) noexcept -> void {
-            type = static_cast<TaskType>(json["type"]);
-            is_on = static_cast<bool>(json["is_on"]);
+            FOX_JSON_GET(json, type);
+            FOX_JSON_GET(json, is_on);
         }
     };
 
@@ -39,13 +42,13 @@ namespace fox::dto {
         kstd::i32 speed;
 
         inline auto serialize(nlohmann::json& json) noexcept -> void {
-            json["type"] = type;
-            json["speed"] = speed;
+            FOX_JSON_SET(json, type);
+            FOX_JSON_SET(json, speed);
         }
 
         inline auto deserialize(const nlohmann::json& json) noexcept -> void {
-            type = static_cast<TaskType>(json["type"]);
-            speed = static_cast<kstd::i32>(json["speed"]);
+            FOX_JSON_GET(json, type);
+            FOX_JSON_GET(json, speed);
         }
     };
 
@@ -54,13 +57,13 @@ namespace fox::dto {
         Mode mode;
 
         inline auto serialize(nlohmann::json& json) noexcept -> void {
-            json["type"] = type;
-            json["mode"] = mode;
+            FOX_JSON_SET(json, type);
+            FOX_JSON_SET(json, mode);
         }
 
         inline auto deserialize(const nlohmann::json& json) noexcept -> void {
-            type = static_cast<TaskType>(json["type"]);
-            mode = static_cast<Mode>(json["mode"]);
+            FOX_JSON_GET(json, type);
+            FOX_JSON_GET(json, mode);
         }
     };
 
@@ -100,26 +103,26 @@ namespace fox::dto {
     };
 
     struct DeviceState final {
-        bool is_online;
+        bool accepts_commands;
         bool is_on;
         kstd::u32 target_speed;
         kstd::u32 actual_speed;
         Mode mode;
 
         inline auto serialize(nlohmann::json& json) noexcept -> void {
-            json["is_online"] = is_online;
-            json["is_on"] = is_on;
-            json["target_speed"] = target_speed;
-            json["actual_speed"] = actual_speed;
-            json["mode"] = mode;
+            FOX_JSON_SET(json, accepts_commands);
+            FOX_JSON_SET(json, is_on);
+            FOX_JSON_SET(json, target_speed);
+            FOX_JSON_SET(json, actual_speed);
+            FOX_JSON_SET(json, mode);
         }
 
         inline auto deserialize(const nlohmann::json& json) noexcept -> void {
-            is_online = json["is_online"];
-            is_on = json["is_on"];
-            target_speed = json["target_speed"];
-            actual_speed = json["actual_speed"];
-            mode = json["mode"];
+            FOX_JSON_GET(json, accepts_commands);
+            FOX_JSON_GET(json, is_on);
+            FOX_JSON_GET(json, target_speed);
+            FOX_JSON_GET(json, actual_speed);
+            FOX_JSON_GET(json, mode);
         }
     };
 }
