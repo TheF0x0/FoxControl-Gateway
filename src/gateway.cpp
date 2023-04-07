@@ -93,6 +93,7 @@ namespace fox {
         _server.Post("/authenticate", handle_authenticate);
         _server.Post("/fetch", handle_fetch);
         _server.Post("/setstate", handle_setstate);
+        _server.Post("/setonline", handle_setonline);
         _server.Post(fmt::format("/{}", _endpoint), handle_enqueue);
 
         _server.set_default_headers({ // @formatter:off
@@ -252,6 +253,38 @@ namespace fox {
 
         auto res_body = nlohmann::json::object();
         res_body["tasks"] = self.dequeue_and_compile();
+
+        res.status = 200;
+        res.set_content(res_body.dump(), FOX_JSON_MIME_TYPE);
+    }
+
+    auto Gateway::handle_setonline(const httplib::Request& req, httplib::Response& res) -> void {
+        auto req_body = nlohmann::json::parse(req.body);
+
+        if(!req_body.is_object()) {
+            send_error(res, 500, "Invalid request body type");
+            return;
+        }
+
+        if(!validate_password(req_body)) {
+            send_error(res, 401, "Invalid password");
+            return;
+        }
+
+        if(!req_body.contains("is_online")) {
+            send_error(res, 500, "Invalid property type");
+            return;
+        }
+
+        auto& state = s_instance->_state;
+        const auto previous_state = state.is_online;
+        const auto new_state = req_body["is_online"];
+
+        auto res_body = nlohmann::json::object();
+        res_body["status"] = new_state != previous_state;
+        res_body["previous"] = previous_state;
+
+        state.is_online = new_state;
 
         res.status = 200;
         res.set_content(res_body.dump(), FOX_JSON_MIME_TYPE);

@@ -62,6 +62,8 @@ namespace fox {
 
         static auto handle_fetch(const httplib::Request& req, httplib::Response& res) -> void;
 
+        static auto handle_setonline(const httplib::Request& req, httplib::Response& res) -> void;
+
         static auto handle_setstate(const httplib::Request& req, httplib::Response& res) -> void;
 
         static auto handle_getstate(const httplib::Request& req, httplib::Response& res) -> void;
