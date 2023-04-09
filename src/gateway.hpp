@@ -31,10 +31,13 @@ namespace fox {
         httplib::Server _server;
 
         std::string _address;
-        std::string _endpoint;
         kstd::u32 _port;
         kstd::u32 _backlog;
+
         std::string _password;
+        std::shared_mutex _password_mutex;
+        std::string _session_password;
+        std::shared_mutex _session_password_mutex;
 
         std::atomic_bool _is_running;
         std::thread _command_thread;
@@ -49,17 +52,31 @@ namespace fox {
         std::atomic_size_t _total_task_count;
         std::atomic_size_t _total_processed_count;
 
+        static auto generate_password(kstd::usize length = 16) noexcept -> std::string;
+
         static auto send_error(httplib::Response& res, kstd::i32 status, const std::string_view& message) noexcept -> void;
 
-        static auto validate_password(const nlohmann::json& json) -> bool;
+        static auto validate_server_password(const nlohmann::json& json) -> bool;
+
+        static auto validate_client_password(const nlohmann::json& json) -> bool;
 
         static auto command_loop(Gateway* self) noexcept -> void;
 
         static auto handle_error(const httplib::Request& req, httplib::Response& res) -> void;
 
-        static auto handle_authenticate(const httplib::Request& req, httplib::Response& res) -> void;
+        // Web endpoints
 
         static auto handle_status(const httplib::Request& req, httplib::Response& res) -> void;
+
+        // Client endpoints
+
+        static auto handle_authenticate(const httplib::Request& req, httplib::Response& res) -> void;
+
+        static auto handle_getstate(const httplib::Request& req, httplib::Response& res) -> void;
+
+        static auto handle_enqueue(const httplib::Request& req, httplib::Response& res) -> void;
+
+        // Server endpoints
 
         static auto handle_fetch(const httplib::Request& req, httplib::Response& res) -> void;
 
@@ -67,9 +84,7 @@ namespace fox {
 
         static auto handle_setstate(const httplib::Request& req, httplib::Response& res) -> void;
 
-        static auto handle_getstate(const httplib::Request& req, httplib::Response& res) -> void;
-
-        static auto handle_enqueue(const httplib::Request& req, httplib::Response& res) -> void;
+        static auto handle_newsession(const httplib::Request& req, httplib::Response& res) -> void;
 
         [[nodiscard]] auto dequeue_and_compile() noexcept -> nlohmann::json;
 
@@ -79,7 +94,7 @@ namespace fox {
 
         public:
 
-        Gateway(std::string address, std::string endpoint, kstd::u32 port, kstd::u32 backlog, std::string password) noexcept;
+        Gateway(std::string address, kstd::u32 port, kstd::u32 backlog, std::string password) noexcept;
 
         ~Gateway() noexcept;
 
@@ -118,10 +133,6 @@ namespace fox {
 
         [[nodiscard]] inline auto get_address() const noexcept -> const std::string& {
             return _address;
-        }
-
-        [[nodiscard]] inline auto get_endpoint() const noexcept -> const std::string& {
-            return _endpoint;
         }
 
         [[nodiscard]] inline auto get_port() const noexcept -> kstd::u32 {
